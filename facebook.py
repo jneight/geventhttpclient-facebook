@@ -33,8 +33,6 @@ if user:
 
 """
 
-import cgi
-import time
 import urllib
 import urllib2
 import httplib
@@ -44,21 +42,20 @@ import base64
 import logging
 import socket
 
+from geventhttpclient import HTTPClient
+from geventhttpclient.url import URL
+
 # Find a JSON parser
 try:
-    import simplejson as json
+    import ujson as json
 except ImportError:
     try:
-        from django.utils import simplejson as json
+        import simplejson as json
     except ImportError:
         import json
 _parse_json = json.loads
 
-# Find a query string parser
-try:
-    from urlparse import parse_qs
-except ImportError:
-    from cgi import parse_qs
+FACEBOOK_URL = URL('https://graph.facebook.com/')
 
 
 class GraphAPI(object):
@@ -93,6 +90,7 @@ class GraphAPI(object):
     def __init__(self, access_token=None, timeout=None):
         self.access_token = access_token
         self.timeout = timeout
+        self.http = HTTPClient.from_url(FACEBOOK_URL)
 
     def get_object(self, id, **args):
         """Fetchs the given object from the graph."""
@@ -168,28 +166,19 @@ class GraphAPI(object):
 
     def delete_object(self, id):
         """Deletes the object with the given ID from the graph."""
-        self.request(id, post_args={"method": "delete"})
+        return self.request(id, post_args={"method": "delete"})
 
     def delete_request(self, user_id, request_id):
         """Deletes the Request with the given ID for the given user."""
-        conn = httplib.HTTPSConnection('graph.facebook.com')
-
-        url = '/%s_%s?%s' % (
-            request_id,
-            user_id,
-            urllib.urlencode({'access_token': self.access_token}),
-        )
-        conn.request('DELETE', url)
-        response = conn.getresponse()
-        data = response.read()
-
-        response = _parse_json(data)
-        # Raise an error if we got one, but don't not if Facebook just
-        # gave us a Bool value
-        if (response and isinstance(response, dict) and response.get("error")):
-            raise GraphAPIError(response)
-
-        conn.close()
+        path = URL('/%s_%s' % (request_id, user_id))
+        path['access_token'] = self.access_token
+        resp = self.http.delete(path.request_uri)
+        content = resp.read()
+        content = _parse_json(content)
+        if content and isinstance(content, dict) and content.get("error"):
+            raise GraphAPIError(content["error"])
+        self.http.close()
+        return content
 
     def put_photo(self, image, message=None, album_id=None, **kwargs):
         """Uploads an image using multipart/form-data.
@@ -200,6 +189,7 @@ class GraphAPI(object):
         an album for your application.
 
         """
+        raise NotImplemented()
         object_id = album_id or "me"
         #it would have been nice to reuse self.request;
         #but multipart is messy in urllib
@@ -282,45 +272,37 @@ class GraphAPI(object):
 
         """
         args = args or {}
-
+        if not path.startswith('/'):
+            path = '/%s' % path
+        path = URL(path)
         if self.access_token:
             if post_args is not None:
                 post_args["access_token"] = self.access_token
             else:
                 args["access_token"] = self.access_token
-        post_data = None if post_args is None else urllib.urlencode(post_args)
+        path.query.update(args)  # add GET params to url
         try:
-            file = urllib2.urlopen("https://graph.facebook.com/" + path + "?" +
-                                   urllib.urlencode(args),
-                                   post_data, timeout=self.timeout)
-        except urllib2.HTTPError, e:
-            response = _parse_json(e.read())
-            raise GraphAPIError(response)
-        except TypeError:
-            # Timeout support for Python <2.6
-            if self.timeout:
-                socket.setdefaulttimeout(self.timeout)
-            file = urllib2.urlopen("https://graph.facebook.com/" + path + "?" +
-                                   urllib.urlencode(args), post_data)
-        try:
-            fileInfo = file.info()
-            if fileInfo.maintype == 'text':
-                response = _parse_json(file.read())
-            elif fileInfo.maintype == 'image':
-                mimetype = fileInfo['content-type']
-                response = {
-                    "data": file.read(),
-                    "mime-type": mimetype,
-                    "url": file.url,
+            if not post_args:
+                resp = self.http.get(path.request_uri)
+            else:
+                resp = self.http.post(path.request_uri, body=post_args)
+            content = resp.read()
+            if 'image' in resp['content-type']:
+                content = {
+                    'data': content,
+                    'mime-type': resp['content-type'],
+                    'url': path.request_uri
                 }
             else:
-                raise GraphAPIError('Maintype was not text or image')
+                content = _parse_json(content)
+        except Exception as e:
+            raise
+            raise GraphAPIError(e)
         finally:
-            file.close()
-        if response and isinstance(response, dict) and response.get("error"):
-            raise GraphAPIError(response["error"]["type"],
-                                response["error"]["message"])
-        return response
+            self.http.close()
+        if content and isinstance(content, dict) and content.get("error"):
+            raise GraphAPIError(content["error"])
+        return content
 
     def fql(self, query, args=None, post_args=None):
         """FQL query.
@@ -564,3 +546,7 @@ def get_app_access_token(app_id, app_secret):
         file.close()
 
     return result
+
+
+a = GraphAPI(access_token='BAAF3dkQUlRABACuSq0JGDZCsmUN7AD4PVhUKKjJ8QImAD4nswg5tnW5kWaVUp4UA8oXqgENXIIcWYtpLmpI7MXz9ZCCIB90DVkmAwdbW10MoCEH3MZAPQonFu53PZAoZD')
+print a.delete_request('106275389411940', 'likes')
