@@ -37,7 +37,7 @@ import hashlib
 import hmac
 import base64
 import logging
-import socket
+from urlparse import parse_qs
 
 from geventhttpclient import HTTPClient
 from geventhttpclient.url import URL
@@ -348,26 +348,33 @@ class GraphAPI(object):
         Extends the expiration time of a valid OAuth access token. See
         <https://developers.facebook.com/roadmap/offline-access-removal/
         #extend_token>
-
         """
+        http = HTTPClient.from_url(FACEBOOK_URL)
         args = {
             "client_id": app_id,
             "client_secret": app_secret,
             "grant_type": "fb_exchange_token",
             "fb_exchange_token": self.access_token,
         }
-        response = urllib.urlopen("https://graph.facebook.com/oauth/"
-                                  "access_token?" +
-                                  urllib.urlencode(args)).read()
-        query_str = parse_qs(response)
-        if "access_token" in query_str:
-            result = {"access_token": query_str["access_token"][0]}
-            if "expires" in query_str:
-                result["expires"] = query_str["expires"][0]
-            return result
-        else:
-            response = json.loads(response)
-            raise GraphAPIError(response)
+        path = URL('/oauth/access_token')
+        path.query.update(args)  # add GET params to url
+        try:
+            resp = http.get(path.request_uri)
+            content = resp.read()
+            query_str = parse_qs(content)
+            if "access_token" in query_str:
+                result = {"access_token": query_str["access_token"][0]}
+                if "expires" in query_str:
+                    result["expires"] = query_str["expires"][0]
+                return result
+            content = _parse_json(content)
+        except Exception as e:
+            raise GraphAPIError(e)
+        finally:
+            http.close()
+        if content and isinstance(content, dict) and content.get("error"):
+            raise GraphAPIError(content["error"])
+        return content
 
 
 class GraphAPIError(Exception):
