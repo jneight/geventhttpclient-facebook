@@ -33,9 +33,6 @@ if user:
 
 """
 
-import urllib
-import urllib2
-import httplib
 import hashlib
 import hmac
 import base64
@@ -56,6 +53,7 @@ except ImportError:
 _parse_json = json.loads
 
 FACEBOOK_URL = URL('https://graph.facebook.com/')
+FACEBOOK_FQL_URL = URL('https://api.facebook.com/')
 
 
 class GraphAPI(object):
@@ -90,7 +88,6 @@ class GraphAPI(object):
     def __init__(self, access_token=None, timeout=None):
         self.access_token = access_token
         self.timeout = timeout
-        self.http = HTTPClient.from_url(FACEBOOK_URL)
 
     def get_object(self, id, **args):
         """Fetchs the given object from the graph."""
@@ -172,12 +169,13 @@ class GraphAPI(object):
         """Deletes the Request with the given ID for the given user."""
         path = URL('/%s_%s' % (request_id, user_id))
         path['access_token'] = self.access_token
-        resp = self.http.delete(path.request_uri)
+        http = HTTPClient.from_url(FACEBOOK_URL)
+        resp = http.delete(path.request_uri)
         content = resp.read()
         content = _parse_json(content)
         if content and isinstance(content, dict) and content.get("error"):
             raise GraphAPIError(content["error"])
-        self.http.close()
+        http.close()
         return content
 
     def put_photo(self, image, message=None, album_id=None, **kwargs):
@@ -271,6 +269,7 @@ class GraphAPI(object):
         arguments.
 
         """
+        http = HTTPClient.from_url(FACEBOOK_URL)
         args = args or {}
         if not path.startswith('/'):
             path = '/%s' % path
@@ -283,9 +282,9 @@ class GraphAPI(object):
         path.query.update(args)  # add GET params to url
         try:
             if not post_args:
-                resp = self.http.get(path.request_uri)
+                resp = http.get(path.request_uri)
             else:
-                resp = self.http.post(path.request_uri, body=post_args)
+                resp = http.post(path.request_uri, body=post_args)
             content = resp.read()
             if 'image' in resp['content-type']:
                 content = {
@@ -296,10 +295,9 @@ class GraphAPI(object):
             else:
                 content = _parse_json(content)
         except Exception as e:
-            raise
             raise GraphAPIError(e)
         finally:
-            self.http.close()
+            http.close()
         if content and isinstance(content, dict) and content.get("error"):
             raise GraphAPIError(content["error"])
         return content
@@ -310,14 +308,13 @@ class GraphAPI(object):
         Example query: "SELECT affiliations FROM user WHERE uid = me()"
 
         """
+        http = HTTPClient.from_url(FACEBOOK_FQL_URL)
         args = args or {}
         if self.access_token:
             if post_args is not None:
                 post_args["access_token"] = self.access_token
             else:
                 args["access_token"] = self.access_token
-        post_data = None if post_args is None else urllib.urlencode(post_args)
-
         """Check if query is a dict and
            use the multiquery method
            else use single query
@@ -328,33 +325,23 @@ class GraphAPI(object):
         else:
             args["query"] = query
             fql_method = 'fql.query'
-
+        path = URL('/method/%s' % fql_method)
         args["format"] = "json"
-
+        path.query.update(args)  # add GET params to url
         try:
-            file = urllib2.urlopen("https://api.facebook.com/method/" +
-                                   fql_method + "?" + urllib.urlencode(args),
-                                   post_data, timeout=self.timeout)
-        except TypeError:
-            # Timeout support for Python <2.6
-            if self.timeout:
-                socket.setdefaulttimeout(self.timeout)
-            file = urllib2.urlopen("https://api.facebook.com/method/" +
-                                   fql_method + "?" + urllib.urlencode(args),
-                                   post_data)
-
-        try:
-            content = file.read()
-            response = _parse_json(content)
-            #Return a list if success, return a dictionary if failed
-            if type(response) is dict and "error_code" in response:
-                raise GraphAPIError(response)
-        except Exception, e:
-            raise e
+            if not post_args:
+                resp = http.get(path.request_uri)
+            else:
+                resp = http.post(path.request_uri, body=post_args)
+            content = resp.read()
+            content = _parse_json(content)
+        except Exception as e:
+            raise GraphAPIError(e)
         finally:
-            file.close()
-
-        return response
+            http.close()
+        if content and isinstance(content, dict) and content.get("error"):
+            raise GraphAPIError(content["error"])
+        return content
 
     def extend_access_token(self, app_id, app_secret):
         """
@@ -548,5 +535,4 @@ def get_app_access_token(app_id, app_secret):
     return result
 
 
-a = GraphAPI(access_token='BAAF3dkQUlRABACuSq0JGDZCsmUN7AD4PVhUKKjJ8QImAD4nswg5tnW5kWaVUp4UA8oXqgENXIIcWYtpLmpI7MXz9ZCCIB90DVkmAwdbW10MoCEH3MZAPQonFu53PZAoZD')
-print a.delete_request('106275389411940', 'likes')
+
