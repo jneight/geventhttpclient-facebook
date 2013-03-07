@@ -1,3 +1,9 @@
+This fork is still in development:
+    TODO: 
+        put_photo isn't working yet.
+        shortcuts out of GraphAPI class aren't tested
+
+
 ===================
 Facebook Python SDK
 ===================
