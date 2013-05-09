@@ -169,7 +169,8 @@ class GraphAPI(object):
         """Deletes the Request with the given ID for the given user."""
         path = URL('/%s_%s' % (request_id, user_id))
         path['access_token'] = self.access_token
-        http = HTTPClient.from_url(FACEBOOK_URL)
+        http = HTTPClient.from_url(
+            FACEBOOK_URL, connection_timeout=self.timeout)
         resp = http.delete(path.request_uri)
         content = resp.read()
         content = _parse_json(content)
@@ -269,7 +270,8 @@ class GraphAPI(object):
         arguments.
 
         """
-        http = HTTPClient.from_url(FACEBOOK_URL)
+        http = HTTPClient.from_url(
+            FACEBOOK_URL, connection_timeout=self.timeout)
         args = args or {}
         if not path.startswith('/'):
             path = '/%s' % path
@@ -308,7 +310,8 @@ class GraphAPI(object):
         Example query: "SELECT affiliations FROM user WHERE uid = me()"
 
         """
-        http = HTTPClient.from_url(FACEBOOK_FQL_URL)
+        http = HTTPClient.from_url(
+            FACEBOOK_FQL_URL, connection_timeout=self.timeout)
         args = args or {}
         if self.access_token:
             if post_args is not None:
@@ -349,7 +352,8 @@ class GraphAPI(object):
         <https://developers.facebook.com/roadmap/offline-access-removal/
         #extend_token>
         """
-        http = HTTPClient.from_url(FACEBOOK_URL)
+        http = HTTPClient.from_url(
+            FACEBOOK_URL, connection_timeout=self.timeout)
         args = {
             "client_id": app_id,
             "client_secret": app_secret,
