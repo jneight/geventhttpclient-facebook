@@ -568,4 +568,12 @@ def get_app_access_token(app_id, app_secret):
     return query_str['access_token']
 
 
+def get_app(access_token):
+    """
+        Get the app info from the access token
 
+        access_token = retrieved from the user
+    """
+    http = GraphAPI(access_token)
+    response = http.request(path='/app')
+    return response
