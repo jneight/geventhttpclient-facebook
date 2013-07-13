@@ -205,38 +205,6 @@ class GraphAPI(object):
 
         """
         raise NotImplemented()
-        # object_id = album_id or "me"
-        # #it would have been nice to reuse self.request;
-        # #but multipart is messy in urllib
-        # post_args = {
-        #     'access_token': self.access_token,
-        #     'source': image,
-        #     'message': message,
-        # }
-        # post_args.update(kwargs)
-        # content_type, body = self._encode_multipart_form(post_args)
-        # req = urllib2.Request(("https://graph.facebook.com/%s/photos" %
-        #                        object_id),
-        #                       data=body)
-        # req.add_header('Content-Type', content_type)
-        # try:
-        #     data = urllib2.urlopen(req).read()
-        # #For Python 3 use this:
-        # #except urllib2.HTTPError as e:
-        # except urllib2.HTTPError, e:
-        #     data = e.read()  # Facebook sends OAuth errors as 400, and urllib2
-        #                      # throws an exception, we want a GraphAPIError
-        # try:
-        #     response = _parse_json(data)
-        #     # Raise an error if we got one, but don't not if Facebook just
-        #     # gave us a Bool value
-        #     if (response and isinstance(response, dict) and
-        #             response.get("error")):
-        #         raise GraphAPIError(response)
-        # except ValueError:
-        #     response = data
-
-        # return response
 
     # based on: http://code.activestate.com/recipes/146306/
     def _encode_multipart_form(self, fields):
@@ -250,34 +218,6 @@ class GraphAPI(object):
 
         """
         raise NotImplemented()
-        # BOUNDARY = '----------ThIs_Is_tHe_bouNdaRY_$'
-        # CRLF = '\r\n'
-        # L = []
-        # for (key, value) in fields.items():
-        #     logging.debug("Encoding %s, (%s)%s" % (key, type(value), value))
-        #     if not value:
-        #         continue
-        #     L.append('--' + BOUNDARY)
-        #     if hasattr(value, 'read') and callable(value.read):
-        #         filename = getattr(value, 'name', '%s.jpg' % key)
-        #         L.append(('Content-Disposition: form-data;'
-        #                   'name="%s";'
-        #                   'filename="%s"') % (key, filename))
-        #         L.append('Content-Type: image/jpeg')
-        #         value = value.read()
-        #         logging.debug(type(value))
-        #     else:
-        #         L.append('Content-Disposition: form-data; name="%s"' % key)
-        #     L.append('')
-        #     if isinstance(value, unicode):
-        #         logging.debug("Convert to ascii")
-        #         value = value.encode('ascii')
-        #     L.append(value)
-        # L.append('--' + BOUNDARY + '--')
-        # L.append('')
-        # body = CRLF.join(L)
-        # content_type = 'multipart/form-data; boundary=%s' % BOUNDARY
-        # return content_type, body
 
     def request(self, path, args=None, post_args=None):
         """Fetches the given path in the Graph API.
