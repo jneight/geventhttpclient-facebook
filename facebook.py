@@ -36,8 +36,6 @@ if user:
 import hashlib
 import hmac
 import base64
-import logging
-import collections
 import sys
 try:
     from urllib.parse import parse_qs
@@ -243,7 +241,7 @@ class GraphAPI(object):
             if not post_args:
                 resp = http.get(path.request_uri)
             else:
-                resp = http.post(path.request_uri, body=post_args)
+                resp = http.post(path.request_uri, body=urlencode(post_args))
             content = resp.read()
             if 'image' in resp['content-type']:
                 content = {
@@ -292,7 +290,7 @@ class GraphAPI(object):
             if not post_args:
                 resp = http.get(path.request_uri)
             else:
-                resp = http.post(path.request_uri, body=post_args)
+                resp = http.post(path.request_uri, body=urlencode(post_args))
             content = resp.read()
             content = _parse_json(content)
         except Exception as e:
@@ -515,5 +513,42 @@ def get_app(access_token):
         access_token = retrieved from the user
     """
     http = GraphAPI(access_token)
-    response = http.request(path='/app')
-    return response
+    resp = http.request(path='/app')
+    return resp
+
+
+def send_notification(access_token, fb_id, template, href, ref):
+    """
+        Send a new Games Notification
+        https://developers.facebook.com/docs/games/notifications/
+
+            :param access_token: App access token
+            :param fb_id: FB user id
+            :param template: Message to send
+            :param href: relative path of the target (using GET params)
+                for example, index.html?gift_id=123
+            :param ref: used to separate notifications into groups
+
+            :returns: if success return a dict
+                {'success': True}
+            :raises: :class:`GraphAPIError`
+    """
+    path = URL('/{0}/notifications'.format(fb_id))
+    post_args = {
+        'template': template,
+        'href': href,
+        'ref': ref,
+        'access_token': access_token}
+    http = HTTPClient.from_url(FACEBOOK_URL)
+    try:
+        resp = http.post(path.request_uri, body=urlencode(post_args))
+        content = _parse_json(resp.read())
+    except Exception as e:
+        raise GraphAPIError(e)
+    finally:
+        http.close()
+    if content and isinstance(content, dict) and content.get('error'):
+        raise GraphAPIError(content['error'])
+    return content
+
+
